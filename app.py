@@ -19,10 +19,8 @@ def index():
         elif "Stop" in request.form:
             robot.stop()
         
-        # IMPORTANTE: devi sempre restituire una risposta
         return render_template("index.html")
     
-    # GET request
     return render_template("index.html")
 
 if __name__ == "__main__":
