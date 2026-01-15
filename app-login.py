@@ -115,9 +115,9 @@ def control():
         elif "Stop" in request.form:
             robot.stop()
         
-        return render_template("index.html", username=current_user.id)
+        return render_template("control.html", username=current_user.id)
     
-    return render_template("index.html", username=current_user.id)
+    return render_template("control.html", username=current_user.id)
 
 # Route di logout
 @app.route("/logout")
