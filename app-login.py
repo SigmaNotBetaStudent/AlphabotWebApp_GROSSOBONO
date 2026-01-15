@@ -57,6 +57,7 @@ from flask_login import (
     logout_user, current_user
 )
 import AlphaBot
+import sqlite3 as sql
 
 app = Flask(__name__)
 app.secret_key = 'chiave_segreta_molto_piu_sicura_cambiala!'  # Cambia questa chiave!
@@ -66,6 +67,9 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+#DB
+nomeDB="utenze.db"
+
 robot = AlphaBot.AlphaBot()
 robot.stop()
 
@@ -73,10 +77,18 @@ class User(UserMixin):
     def __init__(self, id):
         self.id = id
 
-USERS = {
-    "admin": {"password": "admin123"},
-    "utente1": {"password": "password1"}
-}
+def dbDictionaryPopulator():
+    con = sql.connect(nomeDB)
+    cur = con.cursor()
+    risultati = cur.execute(f"SELECT User, Psw FROM Utenze").fetchall()
+
+    for username, password in risultati:
+            USERS[username] = {"password": password}
+    return True
+
+USERS = {}
+dbDictionaryPopulator()
+
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -129,3 +141,5 @@ def logout():
 
 if __name__ == "__main__":
     app.run(debug=False, host="0.0.0.0")
+
+
