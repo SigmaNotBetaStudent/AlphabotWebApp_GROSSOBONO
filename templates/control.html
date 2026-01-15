@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controllo - AlphaBot</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .control-container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .user-info {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #666;
+        }
+
+        .user-info a {
+            color: #667eea;
+            text-decoration: none;
+            margin-left: 10px;
+        }
+
+        .user-info a:hover {
+            text-decoration: underline;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        .btn-forward {
+            grid-column: 2;
+        }
+
+        .btn-left {
+            grid-column: 1;
+            grid-row: 2;
+        }
+
+        .btn-stop {
+            grid-column: 2;
+            grid-row: 2;
+            background: #e74c3c;
+        }
+
+        .btn-stop:hover {
+            background: #c0392b;
+        }
+
+        .btn-right {
+            grid-column: 3;
+            grid-row: 2;
+        }
+
+        .btn-backward {
+            grid-column: 2;
+            grid-row: 3;
+        }
+    </style>
+</head>
+<body>
+    <div class="control-container">
+        <h1>AlphaBot Control</h1>
+        
+        <div class="user-info">
+            Benvenuto, <strong>{{ username }}</strong>
+            <a href="{{ url_for('logout') }}">Logout</a>
+        </div>
+        
+        <form method="POST">
+            <div class="controls">
+                <button type="submit" name="Avanti" class="btn-forward">⬆️ Avanti</button>
+                <button type="submit" name="Sinistra" class="btn-left">⬅️ Sinistra</button>
+                <button type="submit" name="Stop" class="btn-stop">⏹️ Stop</button>
+                <button type="submit" name="Destra" class="btn-right">➡️ Destra</button>
+                <button type="submit" name="Indietro" class="btn-backward">⬇️ Indietro</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>
