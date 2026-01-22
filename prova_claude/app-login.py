@@ -68,14 +68,14 @@ def joystick_control():
         
         # Normalizza i valori da -85/85 a -100/100
         max_joy = 85.0
-        x_norm = (x / max_joy) * 100
+        x_norm = -(x / max_joy) * 100  # Inverti X per correggere sinistra/destra
         y_norm = -(y / max_joy) * 100  # Inverti Y (negativo = avanti)
         
         # Calcola velocità motori con mixing
-        # Motore destro (right): base + steering
-        # Motore sinistro (left): base - steering
-        right_speed = y_norm + x_norm
-        left_speed = y_norm - x_norm
+        # Motore sinistro (left): base + steering
+        # Motore destro (right): base - steering
+        left_speed = y_norm + x_norm
+        right_speed = y_norm - x_norm
         
         # Limita i valori a -100/+100
         right_speed = max(-100, min(100, right_speed))
