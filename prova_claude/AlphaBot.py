@@ -103,7 +103,3 @@ class AlphaBot(object):
 		
 		time.sleep(duration)
 		self.stop()
-
-
-
-	
