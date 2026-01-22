@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AlphaBot Control - Joystick</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        h1 {
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        h3 {
+            color: #f0f0f0;
+            font-weight: normal;
+        }
+
+        .joystick-container {
+            margin: 40px auto;
+            position: relative;
+            width: 250px;
+            height: 250px;
+        }
+
+        .joystick-base {
+            width: 250px;
+            height: 250px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            border: 3px solid rgba(255, 255, 255, 0.4);
+            position: relative;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .joystick-stick {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            cursor: grab;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+            border: 3px solid white;
+            transition: background 0.1s;
+        }
+
+        .joystick-stick:active {
+            cursor: grabbing;
+            background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
+        }
+
+        .status {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 10px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .status h3 {
+            color: #333;
+            margin: 10px 0;
+        }
+
+        .motor-status {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+        }
+
+        .motor {
+            flex: 1;
+            margin: 0 10px;
+        }
+
+        .motor-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .motor-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+
+        .coordinates {
+            font-size: 14px;
+            color: #666;
+            font-family: monospace;
+            margin-top: 15px;
+        }
+
+        .deadzone {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🤖 Controllo AlphaBot</h1>
+    <h3>Trascina il joystick per controllare velocità e direzione</h3>
+
+    <div class="joystick-container">
+        <div class="joystick-base" id="base">
+            <div class="deadzone"></div>
+            <div class="joystick-stick" id="stick"></div>
+        </div>
+    </div>
+
+    <div class="status">
+        <h3>Velocità Motori:</h3>
+        <div class="motor-status">
+            <div class="motor">
+                <div class="motor-label">Motore Sinistro</div>
+                <div class="motor-value" id="leftMotor">0%</div>
+            </div>
+            <div class="motor">
+                <div class="motor-label">Motore Destro</div>
+                <div class="motor-value" id="rightMotor">0%</div>
+            </div>
+        </div>
+        <div class="coordinates" id="coords">X: 0, Y: 0</div>
+    </div>
+
+    <script>
+        const stick = document.getElementById('stick');
+        const base = document.getElementById('base');
+        const coordsDisplay = document.getElementById('coords');
+        const leftMotorDisplay = document.getElementById('leftMotor');
+        const rightMotorDisplay = document.getElementById('rightMotor');
+
+        let isDragging = false;
+        const maxDistance = 85;
+        let lastX = 0;
+        let lastY = 0;
+
+        function getCenter() {
+            const rect = base.getBoundingClientRect();
+            return {
+                x: rect.left + rect.width / 2,
+                y: rect.top + rect.height / 2
+            };
+        }
+
+        function moveStick(clientX, clientY) {
+            const center = getCenter();
+            let deltaX = clientX - center.x;
+            let deltaY = clientY - center.y;
+
+            // Limita il movimento al raggio massimo
+            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            if (distance > maxDistance) {
+                const angle = Math.atan2(deltaY, deltaX);
+                deltaX = Math.cos(angle) * maxDistance;
+                deltaY = Math.sin(angle) * maxDistance;
+            }
+
+            stick.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px))`;
+
+            // Aggiorna coordinate e invia comando
+            lastX = deltaX;
+            lastY = deltaY;
+            coordsDisplay.textContent = `X: ${Math.round(deltaX)}, Y: ${Math.round(deltaY)}`;
+            sendJoystickPosition(deltaX, deltaY);
+        }
+
+        function sendJoystickPosition(x, y) {
+            fetch('/joystick', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ x: x, y: y })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateMotorDisplay(data.left, data.right);
+                }
+            })
+            .catch(err => console.error('Errore:', err));
+        }
+
+        function updateMotorDisplay(left, right) {
+            leftMotorDisplay.textContent = `${left > 0 ? '+' : ''}${left.toFixed(0)}%`;
+            rightMotorDisplay.textContent = `${right > 0 ? '+' : ''}${right.toFixed(0)}%`;
+            
+            // Cambia colore in base alla direzione
+            leftMotorDisplay.style.color = left > 0 ? '#4CAF50' : left < 0 ? '#f44336' : '#666';
+            rightMotorDisplay.style.color = right > 0 ? '#4CAF50' : right < 0 ? '#f44336' : '#666';
+        }
+
+        function resetStick() {
+            stick.style.transform = 'translate(-50%, -50%)';
+            lastX = 0;
+            lastY = 0;
+            coordsDisplay.textContent = 'X: 0, Y: 0';
+            sendJoystickPosition(0, 0);
+        }
+
+        // Event listeners per mouse
+        stick.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                moveStick(e.clientX, e.clientY);
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                resetStick();
+            }
+        });
+
+        // Event listeners per touch (mobile)
+        stick.addEventListener('touchstart', (e) => {
+            isDragging = true;
+            e.preventDefault();
+        });
+
+        document.addEventListener('touchmove', (e) => {
+            if (isDragging) {
+                const touch = e.touches[0];
+                moveStick(touch.clientX, touch.clientY);
+                e.preventDefault();
+            }
+        });
+
+        document.addEventListener('touchend', () => {
+            if (isDragging) {
+                isDragging = false;
+                resetStick();
+            }
+        });
+    </script>
+</body>
+
+</html>

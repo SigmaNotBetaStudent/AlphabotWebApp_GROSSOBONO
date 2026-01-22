@@ -112,7 +112,7 @@ def login():
     
     return render_template("login.html")
 
-@app.route("/control", methods=["GET", "POST"])
+@app.route("/index", methods=["GET", "POST"])
 @login_required
 def control():
     if request.method == "POST":
@@ -127,9 +127,9 @@ def control():
         elif "Stop" in request.form:
             robot.stop()
         
-        return render_template("control.html", username=current_user.id)
+        return render_template("index.html", username=current_user.id)
     
-    return render_template("control.html", username=current_user.id)
+    return render_template("index.html", username=current_user.id)
 
 # Route di logout
 @app.route("/logout")
