@@ -17,46 +17,39 @@ login_manager.login_view = 'login'
 robot = AlphaBot.AlphaBot()
 robot.stop()
 
-# Nome del database
-DB_NAME = 'utenze.db'
-
 class User(UserMixin):
     def __init__(self, id, username):
         self.id = id
         self.username = username
 
 def get_db_connection():
-    """Restituisce una connessione al database"""
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect('utenze.db')
     conn.row_factory = sqlite3.Row
     return conn
 
-def get_user_by_username(username):
-    """Recupera un utente dal database tramite username"""
-    conn = get_db_connection()
-    user = conn.execute('SELECT * FROM Utenze WHERE User = ?', (username,)).fetchone()
-    conn.close()
-    return user
-
-def add_user(username, password):
-    """Aggiunge un nuovo utente al database"""
-    try:
-        conn = get_db_connection()
-        conn.execute('INSERT INTO Utenze (User, Psw) VALUES (?, ?)', (username, password))
-        conn.commit()
-        conn.close()
-        return True
-    except sqlite3.IntegrityError:
-        return False  # Username già esistente
-
+# Carica l'utente dal database
 @login_manager.user_loader
 def load_user(user_id):
     conn = get_db_connection()
-    user = conn.execute('SELECT * FROM Utenze WHERE Id = ?', (user_id,)).fetchone()
+    user_data = conn.execute('SELECT * FROM Utenze WHERE Id = ?', (user_id,)).fetchone()
+    conn.close()
+    if user_data:
+        return User(user_data['Id'], user_data['User'])
+    return None
+
+# Verifica credenziali
+def verify_user(username, password):
+    conn = get_db_connection()
+    user_data = conn.execute('SELECT * FROM Utenze WHERE User = ?', (username,)).fetchone()
     conn.close()
     
-    if user:
-        return User(user['Id'], user['User'])
+    if user_data:
+        # Se le password sono in chiaro nel DB (non consigliato in produzione)
+        if user_data['Psw'] == password:
+            return User(user_data['Id'], user_data['User'])
+        # Se le password sono hashate
+        # if check_password_hash(user_data['Psw'], password):
+        #     return User(user_data['Id'], user_data['User'])
     return None
 
 @app.route("/", methods=["GET", "POST"])
@@ -66,11 +59,10 @@ def login():
         username = request.form.get("username")
         password = request.form.get("password")
         
-        user = get_user_by_username(username)
+        user = verify_user(username, password)
         
-        if user and user['Psw'] == password:
-            user_obj = User(user['Id'], user['User'])
-            login_user(user_obj)
+        if user:
+            login_user(user)
             flash(f"Benvenuto {username}!", "success")
             return redirect(url_for("control"))
         else:
@@ -83,50 +75,36 @@ def login():
 def control():
     return render_template("index.html", username=current_user.username)
 
-@app.route("/register", methods=["GET", "POST"])
-def register():
-    """Route per registrare un nuovo utente"""
-    if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
-        
-        if username and password:
-            if add_user(username, password):
-                flash(f"Utente {username} registrato con successo!", "success")
-                return redirect(url_for("login"))
-            else:
-                flash("Username già esistente!", "error")
-        else:
-            flash("Compila tutti i campi!", "error")
-    
-    return render_template("register.html")
-
+# Nuova route per controllare i motori con il joystick
 @app.route("/joystick", methods=["POST"])
 @login_required
 def joystick_control():
-    data = request.get_json()
-    x = float(data.get('x', 0))
-    y = float(data.get('y', 0))
+    try:
+        data = request.get_json()
+        x = float(data.get('x', 0))
+        y = float(data.get('y', 0))
+        
+        max_joy = 85.0
+        x_norm = -(x / max_joy) * 100
+        y_norm = -(y / max_joy) * 100
+        
+        left_speed = y_norm + x_norm
+        right_speed = y_norm - x_norm
+        
+        right_speed = max(-100, min(100, right_speed))
+        left_speed = max(-100, min(100, left_speed))
+        
+        robot.setMotor(left_speed, right_speed)
+        
+        return jsonify({
+            'success': True,
+            'left': round(left_speed, 1),
+            'right': round(right_speed, 1)
+        })
+    
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
 
-    max_joy = 85.0
-
-    # Scambio assi + inversione corretta
-    turn = (y / max_joy) * 100
-    forward = -(x / max_joy) * 100
-
-    left_speed = forward + turn
-    right_speed = forward - turn
-
-    left_speed = max(-100, min(100, left_speed))
-    right_speed = max(-100, min(100, right_speed))
-
-    robot.setMotor(left_speed, right_speed)
-
-    return jsonify({
-        'success': True,
-        'left': round(left_speed, 1),
-        'right': round(right_speed, 1)
-    })
 @app.route("/logout")
 @login_required
 def logout():
