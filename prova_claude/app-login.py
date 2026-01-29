@@ -5,11 +5,11 @@ from flask_login import (
     logout_user, current_user
 )
 import AlphaBot
+import sqlite3
 
 app = Flask(__name__)
-app.secret_key = 'chiave_segreta_molto_piu_sicura_cambiala!'
+app.secret_key = 'EliaSanMauroSkibidi'
 
-# Inizializzazione Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -17,19 +17,46 @@ login_manager.login_view = 'login'
 robot = AlphaBot.AlphaBot()
 robot.stop()
 
-class User(UserMixin):
-    def __init__(self, id):
-        self.id = id
+# Nome del database
+DB_NAME = 'utenze.db'
 
-USERS = {
-    "admin": {"password": "admin123"},
-    "utente1": {"password": "password1"}
-}
+class User(UserMixin):
+    def __init__(self, id, username):
+        self.id = id
+        self.username = username
+
+def get_db_connection():
+    """Restituisce una connessione al database"""
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def get_user_by_username(username):
+    """Recupera un utente dal database tramite username"""
+    conn = get_db_connection()
+    user = conn.execute('SELECT * FROM Utenze WHERE User = ?', (username,)).fetchone()
+    conn.close()
+    return user
+
+def add_user(username, password):
+    """Aggiunge un nuovo utente al database"""
+    try:
+        conn = get_db_connection()
+        conn.execute('INSERT INTO Utenze (User, Psw) VALUES (?, ?)', (username, password))
+        conn.commit()
+        conn.close()
+        return True
+    except sqlite3.IntegrityError:
+        return False  # Username già esistente
 
 @login_manager.user_loader
 def load_user(user_id):
-    if user_id in USERS:
-        return User(user_id)
+    conn = get_db_connection()
+    user = conn.execute('SELECT * FROM Utenze WHERE Id = ?', (user_id,)).fetchone()
+    conn.close()
+    
+    if user:
+        return User(user['Id'], user['User'])
     return None
 
 @app.route("/", methods=["GET", "POST"])
@@ -39,8 +66,11 @@ def login():
         username = request.form.get("username")
         password = request.form.get("password")
         
-        if username in USERS and USERS[username]["password"] == password:
-            login_user(User(username))
+        user = get_user_by_username(username)
+        
+        if user and user['Psw'] == password:
+            user_obj = User(user['Id'], user['User'])
+            login_user(user_obj)
             flash(f"Benvenuto {username}!", "success")
             return redirect(url_for("control"))
         else:
@@ -51,49 +81,52 @@ def login():
 @app.route("/index")
 @login_required
 def control():
-    return render_template("index.html", username=current_user.id)
+    return render_template("index.html", username=current_user.username)
 
-# Nuova route per controllare i motori con il joystick
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    """Route per registrare un nuovo utente"""
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+        
+        if username and password:
+            if add_user(username, password):
+                flash(f"Utente {username} registrato con successo!", "success")
+                return redirect(url_for("login"))
+            else:
+                flash("Username già esistente!", "error")
+        else:
+            flash("Compila tutti i campi!", "error")
+    
+    return render_template("register.html")
+
 @app.route("/joystick", methods=["POST"])
 @login_required
 def joystick_control():
-    try:
-        data = request.get_json()
-        x = float(data.get('x', 0))
-        y = float(data.get('y', 0))
-        
-        # Converti le coordinate del joystick in velocità dei motori
-        # x: -85 a +85 (sinistra/destra)
-        # y: -85 a +85 (avanti/indietro, negativo = avanti)
-        
-        # Normalizza i valori da -85/85 a -100/100
-        max_joy = 85.0
-        x_norm = -(x / max_joy) * 100  # Inverti X per correggere sinistra/destra
-        y_norm = -(y / max_joy) * 100  # Inverti Y (negativo = avanti)
-        
-        # Calcola velocità motori con mixing
-        # Motore sinistro (left): base + steering
-        # Motore destro (right): base - steering
-        left_speed = y_norm + x_norm
-        right_speed = y_norm - x_norm
-        
-        # Limita i valori a -100/+100
-        right_speed = max(-100, min(100, right_speed))
-        left_speed = max(-100, min(100, left_speed))
-        
-        # Invia i comandi al robot
-        robot.setMotor(left_speed, right_speed)
-        
-        return jsonify({
-            'success': True,
-            'left': round(left_speed, 1),
-            'right': round(right_speed, 1)
-        })
-    
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 400
+    data = request.get_json()
+    x = float(data.get('x', 0))
+    y = float(data.get('y', 0))
 
-# Route di logout
+    max_joy = 85.0
+
+    # Scambio assi + inversione corretta
+    turn = (y / max_joy) * 100
+    forward = -(x / max_joy) * 100
+
+    left_speed = forward + turn
+    right_speed = forward - turn
+
+    left_speed = max(-100, min(100, left_speed))
+    right_speed = max(-100, min(100, right_speed))
+
+    robot.setMotor(left_speed, right_speed)
+
+    return jsonify({
+        'success': True,
+        'left': round(left_speed, 1),
+        'right': round(right_speed, 1)
+    })
 @app.route("/logout")
 @login_required
 def logout():
